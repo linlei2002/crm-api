@@ -10,11 +10,14 @@ import com.crm.entity.Customer;
 import com.crm.entity.SysManager;
 import com.crm.mapper.CustomerMapper;
 import com.crm.query.CustomerQuery;
+import com.crm.query.CustomerTrendQuery;
 import com.crm.query.IdQuery;
 import com.crm.security.user.SecurityUser;
 import com.crm.service.CustomerService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.crm.utils.DateUtils;
 import com.crm.utils.ExcelUtils;
+import com.crm.vo.CustomerTrendVO;
 import com.crm.vo.CustomerVO;
 import com.fhs.common.utils.StringUtil;
 import com.github.yulichang.base.MPJBaseMapper;
@@ -24,8 +27,19 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import javax.swing.text.DateFormatter;
 import java.security.Security;
+import java.text.DateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static com.crm.utils.DateUtils.getHourData;
+import static com.crm.utils.DateUtils.getMonthInRange;
 
 /**
  * <p>
@@ -141,5 +155,58 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         wrapper.orderByDesc(Customer::getCreateTime);
 
         return wrapper;
+    }
+
+    @Override
+    public Map<String, List> getCustomerTrendData(CustomerTrendQuery query) {
+        List<String> timeList = new ArrayList<>();
+        List<Integer> countList = new ArrayList<>();
+        List<CustomerTrendVO> tradeStatistics;
+
+        if ("day".equals(query.getTransactionType())){
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime truncateNow = now.truncatedTo(ChronoUnit.SECONDS);
+            LocalDateTime startTime = now.withHour(0).withMinute(0).withSecond(0).truncatedTo(ChronoUnit.SECONDS);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            ArrayList<String> timeRange = new ArrayList<>();
+            timeRange.add(formatter.format(startTime));
+            timeRange.add(formatter.format(truncateNow));
+            query.setTimeRange(timeRange);
+
+            timeList = getHourData(timeList);
+            tradeStatistics = baseMapper.getTradeStatistics(query);
+        } else if ("monthrange".equals(query.getTransactionType())) {
+            query.setTimeFormat("'%Y-%m'");
+            timeList = getMonthInRange(query.getTimeRange().get(0),query.getTimeRange().get(1));
+            tradeStatistics = baseMapper.getTradeStatisticsByDay(query);
+        } else {
+            query.setTimeFormat("'%Y-%m-%d'");
+            timeList = DateUtils.getDatesInRange(query.getTimeRange().get(0),query.getTimeRange().get(1));
+            tradeStatistics = baseMapper.getTradeStatisticsByDay(query);
+        }
+
+        List<CustomerTrendVO> finalTradeStatistics = tradeStatistics;
+        timeList.forEach(item -> {
+            CustomerTrendVO statisticsVO = finalTradeStatistics.stream().filter(vo -> {
+                if ("day".equals(query.getTransactionType())){
+                    return item.substring(0,2).equals(vo.getTradeTime().substring(0,2));
+                }else {
+                    return item.equals(vo.getTradeTime());
+                }
+            })
+                    .findFirst()
+                    .orElse(null);
+
+            if (statisticsVO != null){
+                countList.add(statisticsVO.getTradeCount());
+            }else {
+                countList.add(0);
+            }
+        });
+
+        Map<String, List> result = new HashMap<>();
+        result.put("timeList",timeList);
+        result.put("countList",countList);
+        return result;
     }
 }

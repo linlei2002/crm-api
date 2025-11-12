@@ -1,8 +1,10 @@
 package com.crm.controller;
 
+import com.crm.common.aop.Log;
 import com.crm.common.result.PageResult;
 import com.crm.common.result.Result;
 import com.crm.entity.Department;
+import com.crm.enums.BusinessType;
 import com.crm.query.DepartmentQuery;
 import com.crm.query.IdQuery;
 import com.crm.service.DepartmentService;
@@ -34,24 +36,29 @@ public class DepartmentController {
 
     @PostMapping("page")
     @Operation(summary = "部门分页列表")
+    @Log(title = "部门列表-分页查询", businessType = BusinessType.SELECT)
     public Result<PageResult<Department>> getPage(@RequestBody @Valid DepartmentQuery query){
         return Result.ok(departmentService.getPage(query));
     }
 
     @PostMapping("list")
     @Operation(summary = "部门列表查询")
+    @Log(title = "部门列表-查询", businessType = BusinessType.SELECT)
     public Result<List<Department>> getList(){
         return Result.ok(departmentService.getList());
     }
 
     @PostMapping("saveOrEdit")
     @Operation(summary = "保存或编辑部门")
+    @Log(title = "部门列表-保存或编辑", businessType = BusinessType.INSERT_OR_UPDATE)
     public Result saveOrEditDepartment(@RequestBody Department department) {
         departmentService.saveOrEditDepartment(department);
         return Result.ok();
     }
 
     @PostMapping("remove")
+    @Operation(summary = "删除部门")
+    @Log(title = "部门列表-删除", businessType = BusinessType.DELETE)
     public Result removeDepartment(@RequestBody @Valid IdQuery query) {
         departmentService.removeDepartment(query);
         return Result.ok();
