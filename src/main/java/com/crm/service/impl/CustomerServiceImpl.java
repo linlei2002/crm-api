@@ -181,6 +181,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             tradeStatistics = baseMapper.getTradeStatisticsByDay(query);
         } else {
             query.setTimeFormat("'%Y-%m-%d'");
+            log.info("时间参数:{}",query.getTimeRange());
             timeList = DateUtils.getDatesInRange(query.getTimeRange().get(0),query.getTimeRange().get(1));
             tradeStatistics = baseMapper.getTradeStatisticsByDay(query);
         }

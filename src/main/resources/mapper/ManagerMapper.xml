@@ -8,6 +8,7 @@
         <result column="account" property="account" />
         <result column="nickname" property="nickname" />
         <result column="password" property="password" />
+        <result column="email" property="email" />
         <result column="status" property="status" />
         <result column="delete_flag" property="deleteFlag" />
         <result column="create_time" property="createTime" />

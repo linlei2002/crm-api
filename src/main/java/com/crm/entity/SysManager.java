@@ -31,6 +31,9 @@ public class SysManager {
     @TableField("status")
     private Integer status;
 
+    @TableField("email")
+    private String email;
+
     @TableField("depart_id")
     private Integer departId;
 

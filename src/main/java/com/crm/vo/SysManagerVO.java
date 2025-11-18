@@ -39,6 +39,9 @@ public class SysManagerVO implements Serializable {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
+    @Schema(description = "邮箱")
+    private String email;
+
     @Schema(description = "角色id")
     private Integer roleId;
 

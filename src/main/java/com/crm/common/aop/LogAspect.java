@@ -39,7 +39,7 @@ public class LogAspect {
 
     public static final String[] EXCLUDE_PARAM_NAMES = {"password", "oldPassword", "newPassword", "confirmPassword"};
 
-    public static final Logger log = LoggerFactory.getLogger(LogAspect.class.getName());
+    public static final Logger log = LoggerFactory.getLogger(LogAspect.class);
 
     private static final ThreadLocal<Long> TIME_THREADLOCAL = new NamedThreadLocal<>("Cost time");
 
@@ -47,16 +47,16 @@ public class LogAspect {
     private OperLogService operLogService;
 
     private PropertyPreExcludeFilter excludePropertyPreFilter(String[] excludeParamNames){
-        return new PropertyPreExcludeFilter().addExcludes(ArrayUtils.addAll(excludeParamNames, EXCLUDE_PARAM_NAMES));
+        return new PropertyPreExcludeFilter().addExcludes(ArrayUtils.addAll(EXCLUDE_PARAM_NAMES,excludeParamNames));
     }
 
     @Before(value = "@annotation(controllerLog)")
-    public void doBefore(JoinPoint joinPoint, Log controllerLog) throws Throwable {
+    public void doBefore(JoinPoint joinPoint, Log controllerLog) {
         TIME_THREADLOCAL.set(System.currentTimeMillis());
     }
 
     @AfterReturning(pointcut = "@annotation(controllerLog)",returning = "jsonResult")
-    public void doAfterReturning(Object jsonResult, JoinPoint joinPoint, Log controllerLog) {
+    public void doAfterReturning(JoinPoint joinPoint,Log controllerLog, Object jsonResult) {
         handleLog(joinPoint, controllerLog, null, jsonResult);
     }
 
@@ -111,8 +111,8 @@ public class LogAspect {
             setRequestValue(joinPoint, operLog, log.excludeParamNames());
         }
 
-        if (log.isSaveResponseData()){
-            operLog.setJsonResult(StringUtils.substring(JSON.toJSONString(jsonResult, excludePropertyPreFilter(EXCLUDE_PARAM_NAMES)), 0, 2000));
+        if (log.isSaveResponseData() && ObjectUtils.isNotEmpty(jsonResult)){
+            operLog.setJsonResult(StringUtils.substring(JSON.toJSONString(jsonResult),0,2000 ));
         }
     }
 

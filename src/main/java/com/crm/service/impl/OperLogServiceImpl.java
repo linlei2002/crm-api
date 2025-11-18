@@ -31,10 +31,16 @@ import java.time.LocalDateTime;
 public class OperLogServiceImpl extends ServiceImpl<OperLogMapper, OperLog> implements OperLogService {
 
     @Override
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordOperLog(OperLog operLog) {
-            operLog.setOperLocation(AddressUtils.getRealAddressByIP(operLog.getOperIp()));
-            operLog.setOperTime(LocalDateTime.now());
-            this.save(operLog);
+            try {
+                operLog.setOperLocation(AddressUtils.getRealAddressByIP(operLog.getOperIp()));
+                operLog.setOperTime(LocalDateTime.now());
+                baseMapper.insert(operLog);
+            } catch (Exception e)  {
+                log.error("操作日志记录异常：{}",e.getMessage());
+            }
     }
 
     @Override

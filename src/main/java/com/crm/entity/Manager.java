@@ -46,6 +46,10 @@ public class Manager {
     @TableField("status")
     private Byte status;
 
+    @ApiModelProperty("管理员邮箱")
+    @TableField("email")
+    private String email;
+
     @ApiModelProperty("删除标识  0：正常   1：已删除")
     @TableField(value = "delete_flag", fill = FieldFill.INSERT)
     @TableLogic

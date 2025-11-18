@@ -6,17 +6,18 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.crm.common.exception.ServerException;
 import com.crm.common.result.PageResult;
 import com.crm.convert.ContractConvert;
-import com.crm.entity.Contract;
-import com.crm.entity.ContractProduct;
-import com.crm.entity.Customer;
-import com.crm.entity.Product;
+import com.crm.entity.*;
 import com.crm.mapper.ContractMapper;
 import com.crm.mapper.ContractProductMapper;
+import com.crm.mapper.CustomerMapper;
 import com.crm.mapper.ProductMapper;
 import com.crm.query.ContractQuery;
+import com.crm.query.ContractTrendQuery;
+import com.crm.query.IdQuery;
 import com.crm.security.user.SecurityUser;
 import com.crm.service.ContractService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.crm.vo.ContractTrendVO;
 import com.crm.vo.ContractVO;
 import com.crm.vo.ProductVO;
 import com.github.yulichang.base.MPJBaseMapper;
@@ -24,14 +25,24 @@ import com.github.yulichang.query.MPJLambdaQueryWrapper;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.crm.utils.NumberUtils.generateContractNumber;
 
@@ -44,14 +55,18 @@ import static com.crm.utils.NumberUtils.generateContractNumber;
  * @since 2025-10-12
  */
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Slf4j
 public class ContractServiceImpl extends ServiceImpl<ContractMapper, Contract> implements ContractService {
     private final ContractProductMapper contractProductMapper;
     private final ProductMapper productMapper;
+    private final CustomerMapper customerMapper;
 
     @Resource
-    private SpringTemplateEngine templateEngine;
+    private JavaMailSender javaMailSender;
+
+    @Value("${spring.mail.username}")
+    private String from;
 
     @Override
     public PageResult<ContractVO> getPage(ContractQuery query) {
@@ -117,6 +132,116 @@ public class ContractServiceImpl extends ServiceImpl<ContractMapper, Contract> i
         }
 
         handleContractProducts(contract.getId(),contractVO.getProducts());
+    }
+
+    @Override
+    public void returnApproval(IdQuery query) {
+        Contract contract = baseMapper.selectById(query.getId());
+        if (contract == null){
+            throw new ServerException("合同不存在");
+        }
+        if (contract.getStatus() == 2){
+            throw new ServerException("该合同审核已通过,请勿重复操作");
+        }
+        contract.setStatus(3);
+        baseMapper.updateById(contract);
+    }
+
+    @Override
+    public void successApproval(IdQuery query) {
+        Contract contract = baseMapper.selectById(query.getId());
+        if (contract == null){
+            throw new ServerException("合同不存在");
+        }
+        if (contract.getStatus() == 2 || contract.getStatus() == 3){
+            throw new ServerException("该合同审核已通过,或被退回");
+        }
+        contract.setStatus(2);
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        contract.setUpdateTime( now);
+        sendMail(query);
+        baseMapper.updateById(contract);
+    }
+
+    @Override
+    public void deleteApproval(IdQuery query) {
+        Contract contract = baseMapper.selectById(query.getId());
+        if (contract == null){
+            throw new ServerException("合同不存在");
+        }
+        if (contract.getStatus() == 2){
+            contract.setStatus(1);
+            LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+            contract.setUpdateTime( now);
+            baseMapper.updateById(contract);
+        }else {
+            throw new ServerException("该合同审核未通过或退回,请勿重复操作");
+        }
+    }
+
+    @Override
+    public void startApproval(IdQuery query) {
+        Contract contract = baseMapper.selectById(query.getId());
+        if (contract == null){
+            throw new ServerException("合同不存在");
+        }
+        if (contract.getStatus() != 0){
+            throw new ServerException("该合同审核已通过，请勿重复提交");
+        }
+        contract.setStatus(1);
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        contract.setUpdateTime( now);
+        baseMapper.updateById(contract);
+    }
+
+    @Override
+    public Map<String, List> getContractStatistics(ContractTrendQuery query) {
+        log.info("getContractStatistics: {}", query.getTransactionType());
+        List<BigDecimal> totalAmount = new ArrayList<>();
+        List<BigDecimal> receivedAmount = new ArrayList<>();
+        List<String> contractName = new ArrayList<>();
+        if("default".equals(query.getTransactionType())){
+            List<ContractTrendVO> contractTrendVOList = baseMapper.getTotalContractStatistics();
+            for (ContractTrendVO contractTrendVO : contractTrendVOList) {
+                totalAmount.add(contractTrendVO.getTotalAmount());
+                receivedAmount.add(contractTrendVO.getReceivedAmount());
+                contractName.add(contractTrendVO.getContractName());
+            }
+        }else {
+            List<ContractTrendVO> contractTrendVOList = baseMapper.getTradeStatisticsByDay(query);
+            for (ContractTrendVO contractTrendVO : contractTrendVOList) {
+                totalAmount.add(contractTrendVO.getTotalAmount());
+                receivedAmount.add(contractTrendVO.getReceivedAmount());
+                contractName.add(contractTrendVO.getContractName());
+            }
+        }
+
+        HashMap<String, List> result = new HashMap<>();
+        result.put("receivedAmount",receivedAmount);
+        result.put("totalAmount",totalAmount);
+        result.put("contractName",contractName);
+
+        return result;
+    }
+
+    @Override
+    public String sendMail(IdQuery query) {
+        Contract contract = baseMapper.selectById(query.getId());
+        Integer customerId = contract.getCustomerId();
+        Customer customer = customerMapper.selectById(customerId);
+        String emailTo = customer.getEmail();
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(emailTo);
+        message.setSubject("合同申请");
+        message.setText("合同审核成功");
+        try {
+            javaMailSender.send(message);
+            return "合同审核成功";
+        } catch (Exception e){
+            return "邮件发送失败";
+        }
     }
 
     private void handleContractProducts(Integer contractId, List<ProductVO> newProductList) {

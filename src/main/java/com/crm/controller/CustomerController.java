@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +40,7 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @PostMapping("page")
-    //@Log(title = "客户列表-分页查询", businessType = BusinessType.SELECT)
+    @Log(title = "客户列表-分页查询", businessType = BusinessType.SELECT)
     public Result<PageResult<CustomerVO>> getPage(@RequestBody @Valid CustomerQuery query){
         return Result.ok(customerService.getPage(query));
     }

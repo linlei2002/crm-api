@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @SpringBootApplication
 @EnableScheduling
+@EnableAsync
+@EnableTransactionManagement
 public class AdminApiApplication extends SpringBootServletInitializer {
 
     public static void main(String[] args) {

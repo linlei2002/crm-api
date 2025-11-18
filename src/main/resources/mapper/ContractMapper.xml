@@ -23,4 +23,29 @@
         <result column="end_time" property="endTime" />
     </resultMap>
 
+    <select id="getTotalContractStatistics" resultType="com.crm.vo.ContractTrendVO">
+        select
+            name as contractName,
+            received_amount as receivedAmount,
+            amount as totalAmount
+        from
+            t_contract
+        where
+            delete_flag = 0
+    </select>
+
+    <select id="getTradeStatisticsByDay" resultType="com.crm.vo.ContractTrendVO">
+        select
+            name as contractName,
+            received_amount as receivedAmount,
+            amount as totalAmount
+        from
+            t_contract
+        where
+            delete_flag = 0
+            <if test="query.timeRange[0] != null and query.timeRange[1] != null">
+                and start_time between #{query.timeRange[0]} and #{query.timeRange[1]}
+            </if>
+    </select>
+
 </mapper>
